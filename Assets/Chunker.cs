@@ -25,7 +25,14 @@ public class Chunker : MonoBehaviour
                 cA.zDimension = chunkHeight;
                 cA.xOffset = chunkWidth * i;
                 cA.zOffset = chunkHeight * j;
+                cA.chunker = this;
             }
         }
+    }
+
+
+
+    public bool BlockExistsAt(int x, int y, int z) {
+        return true;
     }
 }

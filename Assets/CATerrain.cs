@@ -1,20 +1,14 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
-using System.Linq.Expressions;
-using TMPro;
-using TreeEditor;
-using Unity.VisualScripting;
 using UnityEngine;
-using UnityEngine.UIElements;
-using UnityEngine.Video;
 
 public class CATerrain : MonoBehaviour
 {
     public int xOffset, zOffset;
     public int xDimension, zDimension;
     public float noiseScale = 0.1f;
+    public float terrainTypeScale = 0.01f;
 
     [Range(0, 1)]
     public float noiseThreshold = 0.6f;
@@ -24,6 +18,9 @@ public class CATerrain : MonoBehaviour
 
 
     public int maxHeight = 24;
+
+    [HideInInspector]
+    public Chunker chunker;
 
 
 
@@ -57,26 +54,27 @@ public class CATerrain : MonoBehaviour
         // RenderMesh();
     }
 
-
+    enum BlockType {GRASS, WATER, STONE};
 
     void RenderMesh() {
         List<Vector3> verts = new();
+        List<Color> colors = new();
         List<int> tris = new();
 
         bool[,,] points = new bool[xDimension, maxHeight, zDimension];
+        BlockType[,,] blockTypes = new BlockType[xDimension, maxHeight, zDimension];
         
             
         Func<int, int, int, bool> checkIfCubeExist = (int x, int y, int z) => {
             if (x >= points.GetLength(0) || x < 0) {
-                return false;
+                return chunker.BlockExistsAt(x, y, z);
             }
-
             if (y >= points.GetLength(1) || y < 0) {
-                return false;
+                return chunker.BlockExistsAt(x, y, z);
             }
 
             if (z >= points.GetLength(2) || z < 0) {
-                return false;
+                return chunker.BlockExistsAt(x, y, z);
             }
 
             return points[x, y, z];
@@ -86,25 +84,79 @@ public class CATerrain : MonoBehaviour
             for (int i = 0; i < xDimension; i++) {
                 for (int j = 0; j < zDimension; j++) {
                     float noise = Mathf.PerlinNoise(noiseScale * (i + xOffset) * 0.6237f, noiseScale*(j + zOffset) * 0.5663f);
+                    float terrainType = Mathf.PerlinNoise(terrainTypeScale * (i + xOffset) * 0.437f, terrainTypeScale*(j + zOffset) * 0.4363f);
 
                     if (p == 0) {
                         points[i, p, j] = true;
+                        blockTypes[i, p, j] = BlockType.GRASS;
                     } else if (p == 1){
                         if(noise >= noiseThreshold) {
                             points[i, p, j] = true;
+                            blockTypes[i, p, j] = BlockType.GRASS;
                         }
                     } else {
+
+                        float probability = 0f;
+
+                        noise -= noiseThreshold;
+                        BlockType type;
+
+                        if(terrainType < 0.3f) {
+                            noise *= (terrainType + 0.7f);
+                            noise -= 0.15f * p; 
+                            type = BlockType.GRASS; 
+                        } else if(terrainType < 0.5f) {
+                            noise *= terrainType + 0.5f;
+                            noise -= 0.05f * p;  
+                            type = BlockType.GRASS;
+                        } else {
+                            // noise *= terrainType;
+                            noise -= 0.015f * p;  
+                            type = BlockType.STONE;
+                        }
+
+                        if (checkIfCubeExist(i, p-1, j)) {
+                            probability += 0.6f;
+                        }
+
+                        if (checkIfCubeExist(i-1, p-1, j)) {
+                            probability += 0.1f;
+                        }
                         
+                        if (checkIfCubeExist(i+1, p-1, j)) {
+                            probability += 0.1f;
+                        }
+
+                        if (checkIfCubeExist(i, p-1, j-1)) {
+                            probability += 0.1f;
+                        }
+
+                        if (checkIfCubeExist(i, p-1, j+1)) {
+                            probability += 0.1f;
+                        }
+
+                        if(noise > ( 1 - probability)) {
+                            points[i, p, j] = true;
+                            blockTypes[i, p, j] = type;
+                        }
                     }                    
                 }
             }
         }
         
 
+        for(int i = 0; i < xDimension ; i++) {
+            for (int j = 0; j < zDimension; j++) {
+                if(!points[i, 1, j]) {
+                    points[i, 1, j] = true;
+                    blockTypes[i, 1, j] = BlockType.WATER;
+                }
+            }
+        }
 
         // Debug.Log(mesh.vertices.Length);
 
-        (verts, tris) = RenderCubes(points);
+        (verts, colors, tris) = RenderCubes(points, blockTypes);
 
         for(int i = 0; i < verts.Count; i++) {
             verts[i] += new Vector3(xOffset, 0, zOffset);
@@ -122,14 +174,16 @@ public class CATerrain : MonoBehaviour
 
         mesh.vertices = verts.ToArray();
         mesh.triangles = tris.ToArray();
+        mesh.colors = colors.ToArray();
         mesh.RecalculateNormals();
     }   
 
     
 
 
-    (List<Vector3>, List<int>) RenderCubes(bool[,,] points) {
+    (List<Vector3>, List<Color>, List<int>) RenderCubes(bool[,,] points, BlockType[,,] types) {
         List<Vector3> verts = new();
+        List<Color> colors = new();
         List<int> tris = new();
 
         Func<int, int, int, bool> checkIfCubeExist = (int x, int y, int z) => {
@@ -150,9 +204,13 @@ public class CATerrain : MonoBehaviour
 
         int offset = 0;
 
-        Action<Vector3, Vector3, Vector3, Vector3> drawPlane = (Vector3 tl, Vector3 tr, Vector3 bl, Vector3 br) => {
+        Action<Vector3, Vector3, Vector3, Vector3, Color> drawPlane = (Vector3 tl, Vector3 tr, Vector3 bl, Vector3 br, Color c) => {
             verts.AddRange(new Vector3[] {
                 tl, tr, bl, br
+            });
+
+            colors.AddRange(new Color[] {
+                c, c, c, c
             });
 
             tris.AddRange(new int[] {
@@ -179,12 +237,22 @@ public class CATerrain : MonoBehaviour
                     bool forward = checkIfCubeExist(x, y, z+1);
                     bool backward = checkIfCubeExist(x, y, z-1);
 
+                    Color c;
+                    if(types[x, y, z] == BlockType.GRASS) {
+                        c = Color.green;
+                    } else if (types[x, y, z] == BlockType.WATER) {
+                        c = new Color(0.3f, 0.3f, 1.0f, 0.6f);
+                    } else {
+                        c = Color.grey;
+                    }
+
                     if (!left) {
                         drawPlane(
                             new(x - 0.5f, y + 0.5f, z - 0.5f),
                             new(x - 0.5f, y + 0.5f, z + 0.5f),
                             new(x - 0.5f, y - 0.5f, z - 0.5f),
-                            new(x - 0.5f, y - 0.5f, z + 0.5f)
+                            new(x - 0.5f, y - 0.5f, z + 0.5f),
+                            c
                         );
                     }
 
@@ -193,7 +261,8 @@ public class CATerrain : MonoBehaviour
                             new(x + 0.5f, y + 0.5f, z - 0.5f),
                             new(x + 0.5f, y - 0.5f, z - 0.5f),
                             new(x + 0.5f, y + 0.5f, z + 0.5f),
-                            new(x + 0.5f, y - 0.5f, z + 0.5f)
+                            new(x + 0.5f, y - 0.5f, z + 0.5f),
+                            c
                         );
                     }
 
@@ -203,7 +272,8 @@ public class CATerrain : MonoBehaviour
                             new(x + 0.5f, y + 0.5f, z - 0.5f),
                             new(x + 0.5f, y + 0.5f, z + 0.5f),
                             new(x - 0.5f, y + 0.5f, z - 0.5f),
-                            new(x - 0.5f, y + 0.5f, z + 0.5f)
+                            new(x - 0.5f, y + 0.5f, z + 0.5f),
+                            c
                         );
                     }
 
@@ -212,7 +282,8 @@ public class CATerrain : MonoBehaviour
                             new(x + 0.5f, y - 0.5f, z - 0.5f),
                             new(x - 0.5f, y - 0.5f, z - 0.5f),
                             new(x + 0.5f, y - 0.5f, z + 0.5f),
-                            new(x - 0.5f, y - 0.5f, z + 0.5f)
+                            new(x - 0.5f, y - 0.5f, z + 0.5f),
+                            c
                         );
                     }
 
@@ -222,7 +293,8 @@ public class CATerrain : MonoBehaviour
                             new(x + 0.5f, y + 0.5f, z + 0.5f),
                             new(x + 0.5f, y - 0.5f, z + 0.5f),
                             new(x - 0.5f, y + 0.5f, z + 0.5f),
-                            new(x - 0.5f, y - 0.5f, z + 0.5f)
+                            new(x - 0.5f, y - 0.5f, z + 0.5f),
+                            c
                         );
                     }
 
@@ -231,7 +303,8 @@ public class CATerrain : MonoBehaviour
                             new(x + 0.5f, y + 0.5f, z - 0.5f),
                             new(x - 0.5f, y + 0.5f, z - 0.5f),
                             new(x + 0.5f, y - 0.5f, z - 0.5f),
-                            new(x - 0.5f, y - 0.5f, z - 0.5f)
+                            new(x - 0.5f, y - 0.5f, z - 0.5f),
+                            c
                         );
                     }
                 }
@@ -239,7 +312,7 @@ public class CATerrain : MonoBehaviour
         }
 
 
-        return (verts, tris);
+        return (verts, colors, tris);
     }
 }
 

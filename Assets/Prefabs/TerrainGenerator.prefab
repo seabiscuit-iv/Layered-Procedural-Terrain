@@ -100,7 +100,9 @@ MonoBehaviour:
   zOffset: 0
   xDimension: 40
   zDimension: 40
-  noiseScale: 0.1
-  noiseThreshold: 0.41
+  noiseScale: 0.04
+  terrainTypeScale: 0.01
+  noiseThreshold: 0.3
   P: 0.5
-  maxHeight: 24
+  maxHeight: 64
+  chunker: {fileID: 0}

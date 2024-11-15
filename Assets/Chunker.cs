@@ -17,6 +17,8 @@ public class Chunker : MonoBehaviour
     {
         for(int i = 0; i < xChunks; i++) {
             for(int j = 0; j < zChunks; j++) {
+                Debug.Log("Loading Chunk " + i + ", " + j);
+
                 GameObject g = Instantiate(terrainPrefab);
                 // g.transform.position = new Vector3(i * chunkWidth, 0, j * chunkHeight);
 

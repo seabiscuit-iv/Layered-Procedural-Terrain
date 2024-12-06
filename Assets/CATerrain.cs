@@ -68,25 +68,29 @@ public class CATerrain : MonoBehaviour
         bool[,,] points = new bool[xDimension, maxHeight, zDimension];
         BlockType[,,] blockTypes = new BlockType[xDimension, maxHeight, zDimension];
         float[,,] values = new float[xDimension, maxHeight, zDimension];
-        
-            
-        Func<int, int, int, bool> checkIfCubeExist = (int x, int y, int z) => {
-            if (x >= points.GetLength(0) || x < 0) {
+
+
+        bool checkIfCubeExist(int x, int y, int z)
+        {
+            if (x >= points.GetLength(0) || x < 0)
+            {
                 // return chunker.BlockExistsAt(x, y, z);
-                return false;
+                return true;
             }
-            if (y >= points.GetLength(1) || y < 0) {
+            if (y >= points.GetLength(1) || y < 0)
+            {
                 // return chunker.BlockExistsAt(x, y, z);
-                return false;
+                return true;
             }
 
-            if (z >= points.GetLength(2) || z < 0) {
+            if (z >= points.GetLength(2) || z < 0)
+            {
                 // return chunker.BlockExistsAt(x, y, z);
-                return false;
+                return true;
             }
 
             return points[x, y, z];
-        };
+        }
 
         for (int p = 0; p < maxHeight; p++) {
             for (int i = 0; i < xDimension; i++) {
@@ -203,25 +207,30 @@ public class CATerrain : MonoBehaviour
         List<Color> colors = new();
         List<int> tris = new();
 
-        Func<int, int, int, bool> checkIfCubeExist = (int x, int y, int z) => {
-            if (x >= points.GetLength(0) || x < 0) {
+        bool checkIfCubeExist(int x, int y, int z)
+        {
+            if (x >= points.GetLength(0) || x < 0)
+            {
                 return false;
             }
 
-            if (y >= points.GetLength(1) || y < 0) {
+            if (y >= points.GetLength(1) || y < 0)
+            {
                 return false;
             }
 
-            if (z >= points.GetLength(2) || z < 0) {
+            if (z >= points.GetLength(2) || z < 0)
+            {
                 return false;
             }
 
             return points[x, y, z];
-        };
+        }
 
         int offset = 0;
 
-        Action<Vector3, Vector3, Vector3, Vector3, Color> drawPlane = (Vector3 tl, Vector3 tr, Vector3 bl, Vector3 br, Color c) => {
+        void drawPlane(Vector3 tl, Vector3 tr, Vector3 bl, Vector3 br, Color c)
+        {
             verts.AddRange(new Vector3[] {
                 tl, tr, bl, br
             });
@@ -234,9 +243,9 @@ public class CATerrain : MonoBehaviour
                 2 + offset, 1 + offset, 0 + offset,
                 3 + offset, 1 + offset, 2 + offset
             });
-            
+
             offset += 4;
-        };
+        }
 
 
 
